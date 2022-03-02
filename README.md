@@ -100,7 +100,7 @@ import {withFocusable} from '@noriginmedia/react-spatial-navigation';
 
 const Component = ({focused, setFocus}) => (<View>
   <View style={focused ? styles.focusedStyle : styles.defaultStyle} />
-  <TouchableOpacity 
+  <TouchableOpacity
     onPress={() => {
       setFocus('SOME_ANOTHER_COMPONENT');
     }}
@@ -295,7 +295,7 @@ Payload:
 const onPress = ({prop1, prop2}, details) => {...};
 const onRelease = ({prop1, prop2}) => {...};
 ...
-<FocusableItem 
+<FocusableItem
   prop1={111}
   prop2={222}
   onEnterPress={onPress}
@@ -322,7 +322,7 @@ const onPress = (direction, {prop1, prop2}) => {
 };
 
 ...
-<FocusableItem 
+<FocusableItem
   prop1={111}
   prop2={222}
   onArrowPress={onPress}
@@ -340,7 +340,7 @@ The first parameter is the component layout object. The second paramter is an ob
 const onFocused = ({width, height, x, y, top, left, node}, {prop1, prop2}, {event, other}) => {...};
 
 ...
-<FocusableItem 
+<FocusableItem
   prop1={111}
   prop2={222}
   onBecameFocused={onFocused}
@@ -358,7 +358,7 @@ The first parameter is the component layout object. The second paramter is an ob
 const onBlur = ({width, height, x, y, top, left, node}, {prop1, prop2}, {event, other}) => {...};
 
 ...
-<FocusableItem 
+<FocusableItem
   prop1={111}
   prop2={222}
   onBecameBlurred={onBlur}
@@ -387,7 +387,7 @@ This prop indicates that the component currently has some focused child on any d
 
 ### `setFocus`: function
 This method sets the focus to another component (when focus key is passed as param) or steals the focus to itself (when used w/o params). It is also possible to set focus to a non-existent component, and it will be automatically picked up when component with that focus key will get mounted.
-This preemptive setting of the focus might be useful when rendering lists of data. 
+This preemptive setting of the focus might be useful when rendering lists of data.
 You can assign focus key with the item index and set it to e.g. first item, then as soon as it will be rendered, that item will get focused.
 In Native mode this method is ignored (`noop`).
 This method accepts a second parameter as a details object that will be passed back to the `onBecameFocused` and `onBecameBlurred` callbacks.
@@ -413,7 +413,7 @@ This method works exactly like `setFocus`, but it always sets focus to current c
 This is the only way to set focus in Native mode.
 
 ```jsx
-<TouchableOpacity 
+<TouchableOpacity
   onFocus={stealFocus}
 />
 ```
@@ -450,7 +450,7 @@ npm start
 ```
 This will start local server on `localhost:1234`
 
-Source code is in `src/App.js`
+Source code is in `src/App.tsx`
 
 ## Dev notes
 ### General notes
@@ -462,7 +462,7 @@ Source code is in `src/App.js`
 * `setFocus` method is bound with the current component `realFocusKey` so you can call it w/o params to focus component itself. Also the behaviour of this method can be described as an *attempt to set the focus*, because even if the target component doesn't exist yet, the target focus key will be stored and the focus will be picked up by the component with that focus key when it will get mounted.
 * `parentFocusKey` is propagated to children components through context. This is done because the focusable components tree is not necessary the same as the DOM tree.
 * On mount component adds itself to `spatialNavigation` service storage of all focusable components.
-* On unmount component removes itself from the service. 
+* On unmount component removes itself from the service.
 
 ### `spatialNavigation` Service
 * New components are added in `addFocusable`and removed in `removeFocusable`
