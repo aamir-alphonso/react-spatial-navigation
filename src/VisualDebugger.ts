@@ -4,23 +4,37 @@ const hasDOM = typeof window !== 'undefined' && window.document;
 const WIDTH = hasDOM ? window.innerWidth : 0;
 const HEIGHT = hasDOM ? window.innerHeight : 0;
 
+interface NodeLayout {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+}
+
 class VisualDebugger {
+  private debugCtx: CanvasRenderingContext2D;
+
+  private layoutsCtx: CanvasRenderingContext2D;
+
   constructor() {
     if (hasDOM) {
-      this.debugCtx = VisualDebugger.createCanvas('sn-debug', 1010);
-      this.layoutsCtx = VisualDebugger.createCanvas('sn-layouts', 1000);
+      this.debugCtx = VisualDebugger.createCanvas('sn-debug', '1010');
+      this.layoutsCtx = VisualDebugger.createCanvas('sn-layouts', '1000');
     }
   }
 
-  static createCanvas(id, zIndex) {
-    const canvas =
+  static createCanvas(id: string, zIndex: string) {
+    const canvas: HTMLCanvasElement =
       document.querySelector(`#${id}`) || document.createElement('canvas');
 
     canvas.setAttribute('id', id);
 
     const ctx = canvas.getContext('2d');
 
-    canvas.style = `position: fixed; top: 0; left: 0; z-index: ${zIndex}`;
+    canvas.style.zIndex = zIndex;
+    canvas.style.position = 'fixed';
+    canvas.style.top = '0';
+    canvas.style.left = '0';
 
     document.body.appendChild(canvas);
 
@@ -34,6 +48,7 @@ class VisualDebugger {
     if (!hasDOM) {
       return;
     }
+
     this.debugCtx.clearRect(0, 0, WIDTH, HEIGHT);
   }
 
@@ -41,10 +56,11 @@ class VisualDebugger {
     if (!hasDOM) {
       return;
     }
+
     this.layoutsCtx.clearRect(0, 0, WIDTH, HEIGHT);
   }
 
-  drawLayout(layout, focusKey, parentFocusKey) {
+  drawLayout(layout: NodeLayout, focusKey: string, parentFocusKey: string) {
     if (!hasDOM) {
       return;
     }
@@ -71,7 +87,7 @@ class VisualDebugger {
     );
   }
 
-  drawPoint(x, y, color = 'blue', size = 10) {
+  drawPoint(x: number, y: number, color = 'blue', size = 10) {
     if (!hasDOM) {
       return;
     }

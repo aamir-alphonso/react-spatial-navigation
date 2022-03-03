@@ -6,10 +6,11 @@ import {
   forEach,
   forOwn,
   throttle,
-  difference
+  difference,
+  DebouncedFunc
 } from 'lodash';
 import measureLayout from './measureLayout';
-import VisualDebugger from './visualDebugger';
+import VisualDebugger from './VisualDebugger';
 
 const DIRECTION_LEFT = 'left';
 const DIRECTION_RIGHT = 'right';
@@ -47,7 +48,78 @@ const THROTTLE_OPTIONS = {
   trailing: false
 };
 
-export const getChildClosestToOrigin = (children) => {
+export interface FocusableComponentLayout {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+  x: number;
+  y: number;
+  node: HTMLElement;
+}
+
+interface FocusableComponent {
+  focusKey: string;
+  node: HTMLElement;
+  parentFocusKey: string;
+  onEnterPress: (details?: KeyPressDetails) => void;
+  onEnterRelease: () => void;
+  onArrowPress: (direction: string, details: KeyPressDetails) => boolean;
+  onFocus: (layout: FocusableComponentLayout, details: FocusDetails) => void;
+  onBlur: (layout: FocusableComponentLayout, details: FocusDetails) => void;
+  onUpdateFocus: (focused: boolean) => void;
+  onUpdateHasFocusedChild: (hasFocusedChild: boolean) => void;
+  saveLastFocusedChild: boolean;
+  trackChildren: boolean;
+  preferredChildFocusKey?: string;
+  focusable: boolean;
+  isFocusBoundary: boolean;
+  autoRestoreFocus: boolean;
+  lastFocusedChildKey?: string;
+  layout?: FocusableComponentLayout;
+  layoutUpdated?: boolean;
+}
+
+interface FocusableComponentUpdatePayload {
+  node: HTMLElement;
+  preferredChildFocusKey?: string;
+  focusable: boolean;
+  isFocusBoundary: boolean;
+}
+
+interface FocusableComponentRemovePayload {
+  focusKey: string;
+}
+
+interface CornerCoordinates {
+  x: number;
+  y: number;
+}
+
+interface Corners {
+  a: CornerCoordinates;
+  b: CornerCoordinates;
+}
+
+type PressedKeys = { [index: string]: number };
+
+/**
+ * Extra details about pressed keys passed on the key events
+ */
+export interface KeyPressDetails {
+  pressedKeys: PressedKeys;
+}
+
+/**
+ * Extra details passed from outside to be bounced back on other callbacks
+ */
+export interface FocusDetails {
+  event?: KeyboardEvent;
+}
+
+type KeyMap = { [index: string]: number };
+
+export const getChildClosestToOrigin = (children: FocusableComponent[]) => {
   const childrenClosestToOrigin = sortBy(
     children,
     ({ layout }) => Math.abs(layout.left) + Math.abs(layout.top)
@@ -57,10 +129,73 @@ export const getChildClosestToOrigin = (children) => {
 };
 
 class SpatialNavigation {
+  private focusableComponents: { [index: string]: FocusableComponent };
+
+  private visualDebugger: VisualDebugger;
+
+  /**
+   * Focus key of the currently focused element
+   */
+  private focusKey: string;
+
+  /**
+   * This collection contains focus keys of the elements that are having a child focused
+   * Might be handy for styling of certain parent components if their child is focused.
+   */
+  private parentsHavingFocusedChild: string[];
+
+  private enabled: boolean;
+
+  /**
+   * Used in the React Native environment
+   * In this mode, the library works as a "read-only" helper to sync focused
+   * states for the components when they are focused by the native focus engine
+   */
+  private nativeMode: boolean;
+
+  /**
+   * Throttling delay for key presses in milliseconds
+   */
+  private throttle: number;
+
+  /**
+   * Enables/disables throttling feature
+   */
+  private throttleKeypresses: boolean;
+
+  /**
+   * Storing pressed keys counter by the eventType
+   */
+  private pressedKeys: PressedKeys;
+
+  /**
+   * Flag used to block key events from this service
+   */
+  private paused: boolean;
+
+  private keyDownEventListener: (event: KeyboardEvent) => void;
+
+  private keyDownEventListenerThrottled: DebouncedFunc<
+    (event: KeyboardEvent) => void
+  >;
+
+  private keyUpEventListener: (event: KeyboardEvent) => void;
+
+  private keyMap: KeyMap;
+
+  private debug: boolean;
+
+  private logIndex: number;
+
   /**
    * Used to determine the coordinate that will be used to filter items that are over the "edge"
    */
-  static getCutoffCoordinate(isVertical, isIncremental, isSibling, layout) {
+  static getCutoffCoordinate(
+    isVertical: boolean,
+    isIncremental: boolean,
+    isSibling: boolean,
+    layout: FocusableComponentLayout
+  ) {
     const itemX = layout.left;
     const itemY = layout.top;
     const itemWidth = layout.width;
@@ -69,6 +204,7 @@ class SpatialNavigation {
     const coordinate = isVertical ? itemY : itemX;
     const itemSize = isVertical ? itemHeight : itemWidth;
 
+    // eslint-disable-next-line no-nested-ternary
     return isIncremental
       ? isSibling
         ? coordinate
@@ -82,7 +218,11 @@ class SpatialNavigation {
    * Returns two corners (a and b) coordinates that are used as a reference points
    * Where "a" is always leftmost and topmost corner, and "b" is rightmost bottommost corner
    */
-  static getRefCorners(direction, isSibling, layout) {
+  static getRefCorners(
+    direction: string,
+    isSibling: boolean,
+    layout: FocusableComponentLayout
+  ) {
     const itemX = layout.left;
     const itemY = layout.top;
     const itemWidth = layout.width;
@@ -174,7 +314,11 @@ class SpatialNavigation {
   /**
    * Calculates if the sibling node is intersecting enough with the ref node by the secondary coordinate
    */
-  static isAdjacentSlice(refCorners, siblingCorners, isVerticalDirection) {
+  static isAdjacentSlice(
+    refCorners: Corners,
+    siblingCorners: Corners,
+    isVerticalDirection: boolean
+  ) {
     const { a: refA, b: refB } = refCorners;
     const { a: siblingA, b: siblingB } = siblingCorners;
     const coordinate = isVerticalDirection ? 'x' : 'y';
@@ -197,9 +341,9 @@ class SpatialNavigation {
   }
 
   static getPrimaryAxisDistance(
-    refCorners,
-    siblingCorners,
-    isVerticalDirection
+    refCorners: Corners,
+    siblingCorners: Corners,
+    isVerticalDirection: boolean
   ) {
     const { a: refA } = refCorners;
     const { a: siblingA } = siblingCorners;
@@ -209,9 +353,9 @@ class SpatialNavigation {
   }
 
   static getSecondaryAxisDistance(
-    refCorners,
-    siblingCorners,
-    isVerticalDirection
+    refCorners: Corners,
+    siblingCorners: Corners,
+    isVerticalDirection: boolean
   ) {
     const { a: refA, b: refB } = refCorners;
     const { a: siblingA, b: siblingB } = siblingCorners;
@@ -237,7 +381,12 @@ class SpatialNavigation {
    * Ref Corners are the 2 corners of the current component in the direction of navigation
    * They used as a base to measure adjacent slices
    */
-  sortSiblingsByPriority(siblings, currentLayout, direction, focusKey) {
+  sortSiblingsByPriority(
+    siblings: FocusableComponent[],
+    currentLayout: FocusableComponentLayout,
+    direction: string,
+    focusKey: string
+  ) {
     const isVerticalDirection =
       direction === DIRECTION_DOWN || direction === DIRECTION_UP;
 
@@ -375,11 +524,11 @@ class SpatialNavigation {
   }
 
   init({
-    debug: debug = false,
-    visualDebug: visualDebug = false,
-    nativeMode: nativeMode = false,
-    throttle: throttle = 0,
-    throttleKeypresses: throttleKeypresses = false
+    debug = false,
+    visualDebug = false,
+    nativeMode = false,
+    throttle: throttleParam = 0,
+    throttleKeypresses = false
   } = {}) {
     if (!this.enabled) {
       this.enabled = true;
@@ -389,8 +538,8 @@ class SpatialNavigation {
       this.debug = debug;
 
       if (!this.nativeMode) {
-        if (Number.isInteger(throttle) && throttle > 0) {
-          this.throttle = throttle;
+        if (Number.isInteger(throttleParam) && throttleParam > 0) {
+          this.throttle = throttleParam;
         }
         this.bindEventHandlers();
         if (visualDebug) {
@@ -435,14 +584,14 @@ class SpatialNavigation {
     }
   }
 
-  getEventType(keyCode) {
+  getEventType(keyCode: number) {
     return findKey(this.getKeyMap(), (code) => keyCode === code);
   }
 
   bindEventHandlers() {
     // We check both because the React Native remote debugger implements window, but not window.addEventListener.
     if (typeof window !== 'undefined' && window.addEventListener) {
-      this.keyDownEventListener = (event) => {
+      this.keyDownEventListener = (event: KeyboardEvent) => {
         if (this.paused === true) {
           return;
         }
@@ -464,22 +613,25 @@ class SpatialNavigation {
         event.preventDefault();
         event.stopPropagation();
 
-        const details = {
+        const keysDetails = {
           pressedKeys: this.pressedKeys
         };
 
         if (eventType === KEY_ENTER && this.focusKey) {
-          this.onEnterPress(details);
+          this.onEnterPress(keysDetails);
 
           return;
         }
 
         const preventDefaultNavigation =
-          this.onArrowPress(eventType, details) === false;
+          this.onArrowPress(eventType, keysDetails) === false;
 
         if (preventDefaultNavigation) {
           this.log('keyDownEventListener', 'default navigation prevented');
-          this.visualDebugger && this.visualDebugger.clear();
+
+          if (this.visualDebugger) {
+            this.visualDebugger.clear();
+          }
         } else {
           this.onKeyEvent(event);
         }
@@ -487,7 +639,7 @@ class SpatialNavigation {
 
       // Apply throttle only if the option we got is > 0 to avoid limiting the listener to every animation frame
       if (this.throttle) {
-        this.keyDownEventListener = throttle(
+        this.keyDownEventListenerThrottled = throttle(
           this.keyDownEventListener.bind(this),
           this.throttle,
           THROTTLE_OPTIONS
@@ -495,13 +647,13 @@ class SpatialNavigation {
       }
 
       // When throttling then make sure to only throttle key down and cancel any queued functions in case of key up
-      this.keyUpEventListener = (event) => {
+      this.keyUpEventListener = (event: KeyboardEvent) => {
         const eventType = this.getEventType(event.keyCode);
 
         Reflect.deleteProperty(this.pressedKeys, eventType);
 
         if (this.throttle && !this.throttleKeypresses) {
-          this.keyDownEventListener.cancel();
+          this.keyDownEventListenerThrottled.cancel();
         }
 
         if (eventType === KEY_ENTER && this.focusKey) {
@@ -510,7 +662,12 @@ class SpatialNavigation {
       };
 
       window.addEventListener('keyup', this.keyUpEventListener);
-      window.addEventListener('keydown', this.keyDownEventListener);
+      window.addEventListener(
+        'keydown',
+        this.throttle
+          ? this.keyDownEventListenerThrottled
+          : this.keyDownEventListener
+      );
     }
   }
 
@@ -527,7 +684,7 @@ class SpatialNavigation {
     }
   }
 
-  onEnterPress(details) {
+  onEnterPress(keysDetails: KeyPressDetails) {
     const component = this.focusableComponents[this.focusKey];
 
     /* Guard against last-focused component being unmounted at time of onEnterPress (e.g due to UI fading out) */
@@ -544,7 +701,9 @@ class SpatialNavigation {
       return;
     }
 
-    component.onEnterPress && component.onEnterPress(details);
+    if (component.onEnterPress) {
+      component.onEnterPress(keysDetails);
+    }
   }
 
   onEnterRelease() {
@@ -564,10 +723,12 @@ class SpatialNavigation {
       return;
     }
 
-    component.onEnterRelease && component.onEnterRelease();
+    if (component.onEnterRelease) {
+      component.onEnterRelease();
+    }
   }
 
-  onArrowPress(...args) {
+  onArrowPress(direction: string, keysDetails: KeyPressDetails) {
     const component = this.focusableComponents[this.focusKey];
 
     /* Guard against last-focused component being unmounted at time of onArrowPress (e.g due to UI fading out) */
@@ -581,20 +742,19 @@ class SpatialNavigation {
      * component.focusable. */
 
     return (
-      component && component.onArrowPress && component.onArrowPress(...args)
+      component &&
+      component.onArrowPress &&
+      component.onArrowPress(direction, keysDetails)
     );
   }
 
   /**
    * Move focus by direction, if you can't use buttons or focusing by key.
    *
-   * @param {string} direction
-   * @param {object} details
-   *
    * @example
    * navigateByDirection('right') // The focus is moved to right
    */
-  navigateByDirection(direction, details = {}) {
+  navigateByDirection(direction: string, focusDetails: FocusDetails) {
     if (this.paused === true) {
       return;
     }
@@ -608,7 +768,7 @@ class SpatialNavigation {
 
     if (validDirections.includes(direction)) {
       this.log('navigateByDirection', 'direction', direction);
-      this.smartNavigate(direction, null, details);
+      this.smartNavigate(direction, null, focusDetails);
     } else {
       this.log(
         'navigateByDirection',
@@ -618,8 +778,10 @@ class SpatialNavigation {
     }
   }
 
-  onKeyEvent(event) {
-    this.visualDebugger && this.visualDebugger.clear();
+  onKeyEvent(event: KeyboardEvent) {
+    if (this.visualDebugger) {
+      this.visualDebugger.clear();
+    }
 
     const direction = findKey(
       this.getKeyMap(),
@@ -633,13 +795,18 @@ class SpatialNavigation {
    * This function navigates between siblings OR goes up by the Tree
    * Based on the Direction
    */
-  smartNavigate(direction, fromParentFocusKey, details) {
+  smartNavigate(
+    direction: string,
+    fromParentFocusKey: string,
+    focusDetails: FocusDetails
+  ) {
     this.log('smartNavigate', 'direction', direction);
     this.log('smartNavigate', 'fromParentFocusKey', fromParentFocusKey);
     this.log('smartNavigate', 'this.focusKey', this.focusKey);
 
     if (!this.nativeMode && !fromParentFocusKey) {
       forOwn(this.focusableComponents, (component) => {
+        // eslint-disable-next-line no-param-reassign
         component.layoutUpdated = false;
       });
     }
@@ -737,31 +904,33 @@ class SpatialNavigation {
       );
 
       if (nextComponent) {
-        this.setFocus(nextComponent.focusKey, null, details);
+        this.setFocus(nextComponent.focusKey, focusDetails);
       } else {
         const parentComponent = this.focusableComponents[parentFocusKey];
 
         this.saveLastFocusedChildKey(parentComponent, focusKey);
 
         if (!parentComponent || !parentComponent.isFocusBoundary) {
-          this.smartNavigate(direction, parentFocusKey, details);
+          this.smartNavigate(direction, parentFocusKey, focusDetails);
         }
       }
     }
   }
 
-  saveLastFocusedChildKey(component, focusKey) {
+  saveLastFocusedChildKey(component: FocusableComponent, focusKey: string) {
     if (component) {
       this.log(
         'saveLastFocusedChildKey',
         `${component.focusKey} lastFocusedChildKey set`,
         focusKey
       );
+
+      // eslint-disable-next-line no-param-reassign
       component.lastFocusedChildKey = focusKey;
     }
   }
 
-  log(functionName, debugString, ...rest) {
+  log(functionName: string, debugString: string, ...rest: any[]) {
     if (this.debug) {
       console.log(
         `%c${functionName}%c${debugString}`,
@@ -779,7 +948,7 @@ class SpatialNavigation {
    * It's either the target node OR the one down by the Tree if node has children components
    * Based on "targetFocusKey" that means the "intended component to focus"
    */
-  getNextFocusKey(targetFocusKey) {
+  getNextFocusKey(targetFocusKey: string): string {
     const targetComponent = this.focusableComponents[targetFocusKey];
 
     /**
@@ -878,7 +1047,7 @@ class SpatialNavigation {
     autoRestoreFocus,
     focusable,
     isFocusBoundary
-  }) {
+  }: FocusableComponent) {
     this.focusableComponents[focusKey] = {
       focusKey,
       node,
@@ -907,7 +1076,6 @@ class SpatialNavigation {
 
         /**
          * Node ref is also duplicated in layout to be reported in onFocus callback
-         * E.g. used in native environments to lazy-measure the layout on focus
          */
         node
       },
@@ -928,7 +1096,7 @@ class SpatialNavigation {
     }
   }
 
-  removeFocusable({ focusKey }) {
+  removeFocusable({ focusKey }: FocusableComponentRemovePayload) {
     const componentToRemove = this.focusableComponents[focusKey];
 
     if (componentToRemove) {
@@ -942,9 +1110,9 @@ class SpatialNavigation {
       /**
        * If the component was stored as lastFocusedChild, clear lastFocusedChildKey from parent
        */
-      parentComponent &&
-        parentComponent.lastFocusedChildKey === focusKey &&
-        (parentComponent.lastFocusedChildKey = null);
+      if (parentComponent && parentComponent.lastFocusedChildKey === focusKey) {
+        parentComponent.lastFocusedChildKey = null;
+      }
 
       if (this.nativeMode) {
         return;
@@ -959,7 +1127,7 @@ class SpatialNavigation {
     }
   }
 
-  getNodeLayoutByFocusKey(focusKey) {
+  getNodeLayoutByFocusKey(focusKey: string) {
     const component = this.focusableComponents[focusKey];
 
     if (component) {
@@ -971,7 +1139,7 @@ class SpatialNavigation {
     return null;
   }
 
-  setCurrentFocusedKey(newFocusKey, details) {
+  setCurrentFocusedKey(newFocusKey: string, focusDetails: FocusDetails) {
     if (
       this.isFocusableComponent(this.focusKey) &&
       newFocusKey !== this.focusKey
@@ -983,7 +1151,10 @@ class SpatialNavigation {
       this.saveLastFocusedChildKey(parentComponent, this.focusKey);
 
       oldComponent.onUpdateFocus(false);
-      oldComponent.onBlur(this.getNodeLayoutByFocusKey(this.focusKey), details);
+      oldComponent.onBlur(
+        this.getNodeLayoutByFocusKey(this.focusKey),
+        focusDetails
+      );
     }
 
     this.focusKey = newFocusKey;
@@ -994,12 +1165,12 @@ class SpatialNavigation {
       newComponent.onUpdateFocus(true);
       newComponent.onFocus(
         this.getNodeLayoutByFocusKey(this.focusKey),
-        details
+        focusDetails
       );
     }
   }
 
-  updateParentsHasFocusedChild(focusKey, details) {
+  updateParentsHasFocusedChild(focusKey: string, focusDetails: FocusDetails) {
     const parents = [];
 
     let currentComponent = this.focusableComponents[focusKey];
@@ -1033,25 +1204,25 @@ class SpatialNavigation {
     forEach(parentsToRemoveFlag, (parentFocusKey) => {
       const parentComponent = this.focusableComponents[parentFocusKey];
 
-      parentComponent &&
-        parentComponent.trackChildren &&
+      if (parentComponent && parentComponent.trackChildren) {
         parentComponent.onUpdateHasFocusedChild(false);
-      this.onIntermediateNodeBecameBlurred(parentFocusKey, details);
+      }
+      this.onIntermediateNodeBecameBlurred(parentFocusKey, focusDetails);
     });
 
     forEach(parentsToAddFlag, (parentFocusKey) => {
       const parentComponent = this.focusableComponents[parentFocusKey];
 
-      parentComponent &&
-        parentComponent.trackChildren &&
+      if (parentComponent && parentComponent.trackChildren) {
         parentComponent.onUpdateHasFocusedChild(true);
-      this.onIntermediateNodeBecameFocused(parentFocusKey, details);
+      }
+      this.onIntermediateNodeBecameFocused(parentFocusKey, focusDetails);
     });
 
     this.parentsHavingFocusedChild = parents;
   }
 
-  updateParentsLastFocusedChild(focusKey) {
+  updateParentsLastFocusedChild(focusKey: string) {
     let currentComponent = this.focusableComponents[focusKey];
 
     /**
@@ -1077,14 +1248,14 @@ class SpatialNavigation {
     return this.keyMap;
   }
 
-  setKeyMap(keyMap) {
+  setKeyMap(keyMap: KeyMap) {
     this.keyMap = {
       ...this.getKeyMap(),
       ...keyMap
     };
   }
 
-  isFocusableComponent(focusKey) {
+  isFocusableComponent(focusKey: string) {
     return !!this.focusableComponents[focusKey];
   }
 
@@ -1092,27 +1263,35 @@ class SpatialNavigation {
    * Checks whether the focusableComponent is actually participating in spatial navigation (in other words, is a
    * 'focusable' focusableComponent). Seems less confusing than calling it isFocusableFocusableComponent()
    */
-  isParticipatingFocusableComponent(focusKey) {
+  isParticipatingFocusableComponent(focusKey: string) {
     return (
       this.isFocusableComponent(focusKey) &&
       this.focusableComponents[focusKey].focusable
     );
   }
 
-  onIntermediateNodeBecameFocused(focusKey, details) {
-    this.isParticipatingFocusableComponent(focusKey) &&
+  onIntermediateNodeBecameFocused(
+    focusKey: string,
+    focusDetails: FocusDetails
+  ) {
+    if (this.isParticipatingFocusableComponent(focusKey)) {
       this.focusableComponents[focusKey].onFocus(
         this.getNodeLayoutByFocusKey(focusKey),
-        details
+        focusDetails
       );
+    }
   }
 
-  onIntermediateNodeBecameBlurred(focusKey, details) {
-    this.isParticipatingFocusableComponent(focusKey) &&
+  onIntermediateNodeBecameBlurred(
+    focusKey: string,
+    focusDetails: FocusDetails
+  ) {
+    if (this.isParticipatingFocusableComponent(focusKey)) {
       this.focusableComponents[focusKey].onBlur(
         this.getNodeLayoutByFocusKey(focusKey),
-        details
+        focusDetails
       );
+    }
   }
 
   pause() {
@@ -1123,7 +1302,7 @@ class SpatialNavigation {
     this.paused = false;
   }
 
-  setFocus(focusKey, details: object = {}) {
+  setFocus(focusKey: string, focusDetails: FocusDetails = {}) {
     if (!this.enabled) {
       return;
     }
@@ -1135,8 +1314,8 @@ class SpatialNavigation {
 
     this.log('setFocus', 'newFocusKey', newFocusKey);
 
-    this.setCurrentFocusedKey(newFocusKey, details);
-    this.updateParentsHasFocusedChild(newFocusKey, details);
+    this.setCurrentFocusedKey(newFocusKey, focusDetails);
+    this.updateParentsHasFocusedChild(newFocusKey, focusDetails);
     this.updateParentsLastFocusedChild(lastFocusedKey);
   }
 
@@ -1150,7 +1329,7 @@ class SpatialNavigation {
     });
   }
 
-  updateLayout(focusKey) {
+  updateLayout(focusKey: string) {
     const component = this.focusableComponents[focusKey];
 
     if (!component || this.nativeMode || component.layoutUpdated) {
@@ -1159,22 +1338,20 @@ class SpatialNavigation {
 
     const { node } = component;
 
-    measureLayout(node, (x, y, width, height, left, top) => {
-      component.layout = {
-        x,
-        y,
-        width,
-        height,
-        left,
-        top,
-        node
-      };
-    });
+    component.layout = {
+      ...measureLayout(node),
+      node
+    };
   }
 
   updateFocusable(
-    focusKey,
-    { node, preferredChildFocusKey, focusable, isFocusBoundary }
+    focusKey: string,
+    {
+      node,
+      preferredChildFocusKey,
+      focusable,
+      isFocusBoundary
+    }: FocusableComponentUpdatePayload
   ) {
     if (this.nativeMode) {
       return;

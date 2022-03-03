@@ -31,7 +31,7 @@ function Menu() {
     preferredChildFocusKey: null,
     onEnterPress: () => {},
     onEnterRelease: () => {},
-    onArrowPress: () => {},
+    onArrowPress: () => true,
     onFocus: () => {},
     onBlur: () => {}
   });

@@ -7,10 +7,14 @@ import {
   useState
 } from 'react';
 import { uniqueId, noop } from 'lodash';
-import SpatialNavigation from './SpatialNavigation';
+import SpatialNavigation, {
+  FocusableComponentLayout,
+  FocusDetails,
+  KeyPressDetails
+} from './SpatialNavigation';
 import { useFocusContext } from './useFocusedContext';
 
-interface UseFocusedConfig {
+export interface UseFocusedConfig {
   focusable?: boolean;
   saveLastFocusedChild?: boolean;
   trackChildren?: boolean;
@@ -18,21 +22,34 @@ interface UseFocusedConfig {
   isFocusBoundary?: boolean;
   focusKey?: string;
   preferredChildFocusKey?: string;
-  onEnterPress?: Function;
-  onEnterRelease?: Function;
-  onArrowPress?: Function;
-  onFocus?: Function;
-  onBlur?: Function;
+  onEnterPress?: (props: object, details: KeyPressDetails) => void;
+  onEnterRelease?: (props: object) => void;
+  onArrowPress?: (
+    direction: string,
+    props: object,
+    details: KeyPressDetails
+  ) => boolean;
+  onFocus?: (
+    layout: FocusableComponentLayout,
+    props: object,
+    details: FocusDetails
+  ) => void;
+  onBlur?: (
+    layout: FocusableComponentLayout,
+    props: object,
+    details: FocusDetails
+  ) => void;
+  extraProps?: object;
 }
 
-interface UseFocusedResult {
+export interface UseFocusedResult {
   ref: RefObject<any>; // <any> since we don't know which HTML tag is passed here
   focusSelf: () => void;
   focused: boolean;
   hasFocusedChild: boolean;
   focusKey: string;
   setFocus: (focusKey: string) => void;
-  navigateByDirection: (direction: string) => void;
+  navigateByDirection: (direction: string, focusDetails: FocusDetails) => void;
   pause: () => void;
   resume: () => void;
   updateAllLayouts: () => void;
@@ -48,10 +65,42 @@ const useFocused = ({
   preferredChildFocusKey,
   onEnterPress = noop,
   onEnterRelease = noop,
-  onArrowPress = noop,
+  onArrowPress = () => true,
   onFocus = noop,
-  onBlur = noop
+  onBlur = noop,
+  extraProps
 }: UseFocusedConfig = {}): UseFocusedResult => {
+  const onEnterPressHandler = useCallback(
+    (details: KeyPressDetails) => {
+      onEnterPress(extraProps, details);
+    },
+    [onEnterPress, extraProps]
+  );
+
+  const onEnterReleaseHandler = useCallback(() => {
+    onEnterRelease(extraProps);
+  }, [onEnterRelease, extraProps]);
+
+  const onArrowPressHandler = useCallback(
+    (direction: string, details: KeyPressDetails) =>
+      onArrowPress(direction, extraProps, details),
+    [extraProps, onArrowPress]
+  );
+
+  const onFocusHandler = useCallback(
+    (layout: FocusableComponentLayout, details: FocusDetails) => {
+      onFocus(layout, extraProps, details);
+    },
+    [extraProps, onFocus]
+  );
+
+  const onBlurHandler = useCallback(
+    (layout: FocusableComponentLayout, details: FocusDetails) => {
+      onBlur(layout, extraProps, details);
+    },
+    [extraProps, onBlur]
+  );
+
   const ref = useRef(null);
 
   const [focused, setFocused] = useState(false);
@@ -79,11 +128,11 @@ const useFocused = ({
       node,
       parentFocusKey,
       preferredChildFocusKey,
-      onEnterPress,
-      onEnterRelease,
-      onArrowPress,
-      onFocus,
-      onBlur,
+      onEnterPress: onEnterPressHandler,
+      onEnterRelease: onEnterReleaseHandler,
+      onArrowPress: onArrowPressHandler,
+      onFocus: onFocusHandler,
+      onBlur: onBlurHandler,
       onUpdateFocus: (isFocused = false) => setFocused(isFocused),
       onUpdateHasFocusedChild: (isFocused = false) =>
         setHasFocusedChild(isFocused),
@@ -118,7 +167,9 @@ const useFocused = ({
     focused,
     hasFocusedChild,
     focusKey, // returns either the same focusKey as passed in, or generated one
-    setFocus: SpatialNavigation.setFocus,
+    setFocus: SpatialNavigation.isNativeMode()
+      ? noop
+      : SpatialNavigation.setFocus,
     navigateByDirection: SpatialNavigation.navigateByDirection,
     pause: SpatialNavigation.pause,
     resume: SpatialNavigation.resume,
