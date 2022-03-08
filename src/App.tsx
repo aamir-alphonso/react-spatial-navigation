@@ -3,7 +3,7 @@
  * Disabling ESLint rules for these dependencies since we know it is only for development purposes
  */
 
-import React from 'react';
+import React, { useEffect } from 'react';
 // eslint-disable-next-line import/no-extraneous-dependencies
 import ReactDOM from 'react-dom';
 // eslint-disable-next-line import/no-extraneous-dependencies
@@ -11,6 +11,12 @@ import styled from 'styled-components';
 import { shuffle } from 'lodash';
 import { FocusContext } from './useFocusedContext';
 import useFocused from './useFocused';
+import SpatialNavigation from './SpatialNavigation';
+
+SpatialNavigation.init({
+  debug: false,
+  visualDebug: false
+});
 
 const rows = shuffle([
   {
@@ -21,6 +27,12 @@ const rows = shuffle([
   },
   {
     title: 'Row 3'
+  },
+  {
+    title: 'Row 4'
+  },
+  {
+    title: 'Row 5'
   }
 ]);
 
@@ -63,15 +75,30 @@ const assets = shuffle([
   }
 ]);
 
+interface MenuItemBoxProps {
+  focused: boolean;
+}
+
+const MenuItemBox = styled.div<MenuItemBoxProps>`
+  width: 40px;
+  height: 40px;
+  background-color: ${({ focused }) => (focused ? 'white' : 'yellow')};
+`;
+
 function MenuItem() {
   const { ref, focused } = useFocused();
 
-  return <div ref={ref}>Menu Item</div>;
+  return <MenuItemBox ref={ref} focused={focused} />;
 }
 
 const MenuWrapper = styled.div`
   flex: 1;
-  max-width: 100px;
+  max-width: 80px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-around;
+  align-items: center;
+  background-color: #1c1c1c;
 `;
 
 interface MenuProps {
@@ -82,13 +109,13 @@ function Menu({ focusKey: focusKeyParam }: MenuProps) {
   const {
     ref,
     focusSelf,
-    hasFocusedChild,
-    focusKey,
-    setFocus,
-    navigateByDirection,
-    pause,
-    resume,
-    updateAllLayouts
+    // hasFocusedChild,
+    focusKey
+    // setFocus,
+    // navigateByDirection,
+    // pause,
+    // resume,
+    // updateAllLayouts
   } = useFocused({
     focusable: true,
     saveLastFocusedChild: true,
@@ -105,6 +132,10 @@ function Menu({ focusKey: focusKeyParam }: MenuProps) {
     extraProps: { foo: 'bar' }
   });
 
+  useEffect(() => {
+    focusSelf();
+  }, [focusSelf]);
+
   return (
     <FocusContext.Provider value={focusKey}>
       <MenuWrapper ref={ref}>
@@ -118,8 +149,27 @@ function Menu({ focusKey: focusKeyParam }: MenuProps) {
   );
 }
 
-const AssetBox = styled.div`
-  background-color: ${({ color }) => color};
+const AssetWrapper = styled.div`
+  margin-right: 30px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+`;
+
+interface AssetBoxProps {
+  focused: boolean;
+  color: string;
+}
+
+const AssetBox = styled.div<AssetBoxProps>`
+  width: 80px;
+  height: 80px;
+  background-color: ${({ color, focused }) => (focused ? 'white' : color)};
+`;
+
+const AssetTitle = styled.div`
+  color: white;
+  margin-top: 10px;
 `;
 
 interface AssetProps {
@@ -128,49 +178,86 @@ interface AssetProps {
 }
 
 function Asset({ title, color }: AssetProps) {
+  const { ref, focused } = useFocused();
+
   return (
-    <div>
-      <AssetBox color={color} />
-      <div>{title}</div>
-    </div>
+    <AssetWrapper ref={ref}>
+      <AssetBox color={color} focused={focused} />
+      <AssetTitle>{title}</AssetTitle>
+    </AssetWrapper>
   );
 }
+
+const ContentRowWrapper = styled.div`
+  margin-bottom: 20px;
+`;
+
+const ContentRowTitle = styled.div`
+  color: white;
+  margin-bottom: 10px;
+  font-size: 20px;
+  font-weight: bold;
+`;
+
+const ContentRowScrollingContent = styled.div`
+  display: flex;
+  flex-direction: row;
+`;
 
 interface ContentRowProps {
   title: string;
 }
 
 function ContentRow({ title: rowTitle }: ContentRowProps) {
+  const { ref, focusKey } = useFocused();
+
   return (
-    <div>
-      <div>{rowTitle}</div>
-      <div>
-        {assets.map(({ title, color }) => (
-          <Asset title={title} color={color} />
-        ))}
-      </div>
-    </div>
+    <FocusContext.Provider value={focusKey}>
+      <ContentRowWrapper ref={ref}>
+        <ContentRowTitle>{rowTitle}</ContentRowTitle>
+        <ContentRowScrollingContent>
+          {shuffle(
+            assets.map(({ title, color }) => (
+              <Asset key={title} title={title} color={color} />
+            ))
+          )}
+        </ContentRowScrollingContent>
+      </ContentRowWrapper>
+    </FocusContext.Provider>
   );
 }
 
 const ContentWrapper = styled.div`
   flex: 1;
+  overflow: hidden;
+  padding: 20px;
 `;
 
-const SelectedItem = styled.div``;
+const SelectedItemWrapper = styled.div``;
+
+const SelectedItemBox = styled.div``;
+
+const SelectedItemTitle = styled.div``;
 
 const ContentRows = styled.div``;
 
 function Content() {
+  const { ref, focusKey } = useFocused();
+
   return (
-    <ContentWrapper>
-      <SelectedItem />
-      <ContentRows>
-        {rows.map(({ title }) => (
-          <ContentRow title={title} />
-        ))}
-      </ContentRows>
-    </ContentWrapper>
+    <FocusContext.Provider value={focusKey}>
+      <ContentWrapper ref={ref}>
+        <SelectedItemWrapper>
+          <SelectedItemBox />
+          <SelectedItemTitle>Selected</SelectedItemTitle>
+        </SelectedItemWrapper>
+        <ContentRows>
+          {rows.map(({ title }) => (
+            <ContentRow key={title} title={title} />
+          ))}
+        </ContentRows>
+      </ContentWrapper>
+    </FocusContext.Provider>
   );
 }
 
