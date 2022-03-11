@@ -755,7 +755,7 @@ class SpatialNavigation {
    * navigateByDirection('right') // The focus is moved to right
    */
   navigateByDirection(direction: string, focusDetails: FocusDetails) {
-    if (this.paused === true) {
+    if (this.paused === true || this.nativeMode) {
       return;
     }
 
@@ -800,11 +800,15 @@ class SpatialNavigation {
     fromParentFocusKey: string,
     focusDetails: FocusDetails
   ) {
+    if (this.nativeMode) {
+      return;
+    }
+
     this.log('smartNavigate', 'direction', direction);
     this.log('smartNavigate', 'fromParentFocusKey', fromParentFocusKey);
     this.log('smartNavigate', 'this.focusKey', this.focusKey);
 
-    if (!this.nativeMode && !fromParentFocusKey) {
+    if (!fromParentFocusKey) {
       forOwn(this.focusableComponents, (component) => {
         // eslint-disable-next-line no-param-reassign
         component.layoutUpdated = false;
@@ -946,7 +950,7 @@ class SpatialNavigation {
   /**
    * This function tries to determine the next component to Focus
    * It's either the target node OR the one down by the Tree if node has children components
-   * Based on "targetFocusKey" that means the "intended component to focus"
+   * Based on "targetFocusKey" which means the "intended component to focus"
    */
   getNextFocusKey(targetFocusKey: string): string {
     const targetComponent = this.focusableComponents[targetFocusKey];
