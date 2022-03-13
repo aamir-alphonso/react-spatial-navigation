@@ -236,8 +236,154 @@ setKeyMap({
 Resets all the settings and the storage of focusable components. Disables the navigation service.
 
 ### `useFocusable` hook
+This hook is the main link between the React component (its DOM element) and the navigation service.
+It is used to register the component in the service, get its `focusKey`, `focused` state etc.
+
+```jsx
+const {/* hook output */} = useFocused({/* hook params */});
+```
+
 #### Hook params
+
+##### `focusable` (default: true)
+This flag indicates that the component can be focused via directional navigation.
+Even if the component is not `focusable`, it still can be focused with the manual `setFocus`.
+This flag is useful when i.e. you have a Disabled Button that should not be focusable in the disabled state.
+
+##### `saveLastFocusedChild` (default: true)
+By default, when the focus leaves a Focusable Container, the last focused child of that container is saved.
+So the next time when you go back to that Container, the last focused child will get the focus.
+If this feature is disabled, the focus will be always on the first available child of the Container.
+
+##### `trackChildren` (default: false)
+This flag controls the feature of updating the `hasFocusedChild` flag returned to the hook output.
+Since you don't always need `hasFocusedChild` value, this feature is disabled by default for optimization purposes.
+
+##### `autoRestoreFocus` (default: true)
+By default, when the currently focused component is unmounted (deleted), navigation service will try to restore the focus
+on the nearest available sibling of that component. If this behavior is undesirable, you can disable it by setting this
+flag to `false`.
+
+##### `isFocusBoundary` (default: false)
+This flag makes the Focusable Container keep the focus inside its boundaries. It will only block the focus from leaving
+the Container via directional navigation. You can still set the focus manually anywhere via `setFocus`.
+Useful when i.e. you have a modal Popup and you don't want the focus to leave it.
+
+##### `focusKey` (optional)
+If you want your component to have a persistent focus key, it can be set via this property. Otherwise, it will be auto generated.
+Useful when you want to manually set the focus to this component via `setFocus`.
+
+##### `preferredChildFocusKey` (optional)
+Useful when you have a Focusable Container and you want it to propagate the focus to a **specific** child component.
+I.e. when you have a Popup and you want some specific button to be focused instead of the first available.
+
+##### `onEnterPress` (function)
+Callback that is called when the component is focused and Enter key is pressed.
+Receives `extraProps` (see below) and `KeyPressDetails` as arguments.
+
+##### `onEnterRelease` (function)
+Callback that is called when the component is focused and Enter key is released.
+Receives `extraProps` (see below) as argument.
+
+##### `onArrowPress` (function)
+Callback that is called when component is focused and any Arrow key is pressed.
+Receives `direction` (`left`, `right`, `up`, `down`), `extraProps` (see below) and `KeyPressDetails` as arguments.
+
+##### `onFocus` (function)
+Callback that is called when component gets focus.
+Receives `FocusableComponentLayout`, `extraProps` and `FocusDetails` as arguments.
+
+##### `onBlur` (function)
+Callback that is called when component loses focus.
+Receives `FocusableComponentLayout`, `extraProps` and `FocusDetails` as arguments.
+
+##### `extraProps` (optional)
+An object that can be passed to the hook in order to be passed back to certain callbacks (see above).
+I.e. you can pass all the `props` of the component here, and get them all back in those callbacks.
+
 #### Hook output
+
+##### `ref` (**required**)
+Reference object created by the `useRef` inside the hook. Should be assigned to the DOM element representing a focused
+area for this component. Usually it's a root DOM element of the component.
+
+```jsx
+function Button() {
+  const { ref } = useFocused();
+
+  return (<div ref={ref}>
+    Press me
+  </div>);
+}
+```
+
+##### `focusSelf` (function)
+Method to set the focus on the current component. I.e. to set the focus to the Page (Container) when it is mounted, or
+the Popup component when it is displayed.
+
+##### `setFocus` (function) `(focusKey: string) => void`
+Method to manually set the focus to a component providing its `focusKey`.
+
+##### `focused` (boolean)
+Flag that indicates that the current component is focused.
+
+##### `hasFocusedChild` (boolean)
+Flag that indicates that the current component has a focused child somewhere down the Focusable Tree.
+Only works when `trackChildren` is enabled!
+
+##### `focusKey` (string)
+String that contains the focus key for the component. It is either the same as `focusKey` passed to the hook params,
+or an automatically generated one.
+
+##### `navigateByDirection` (function) `(direction: string, focusDetails: FocusDetails) => void`
+Method to manually navigation to a certain direction. I.e. you can assign a mouse-wheel to navigate Up and Down.
+Also useful when you have some "Arrow-like" UI in the app that is meant to navigate in certain direction when pressed
+with the mouse or a "magic remote" on some TVs.
+
+##### `pause` (function)
+Pauses all the key event handlers.
+
+##### `resume` (function)
+Resumes all the key event handlers.
+
+##### `updateAllLayouts` (function)
+Manually recalculate all the layouts. Rarely used.
+
+### `FocusContext` (required for Focusable Containers)
+Used to provide the `focusKey` of the current Focusable Container down the Tree to the next child level. [See Example](#wrapping-leaf-components-with-a-focusable-container)
+
+## Types
+### `FocusableComponentLayout`
+```ts
+interface FocusableComponentLayout {
+  left: number; // absolute coordinate on the screen
+  top: number; // absolute coordinate on the screen
+  width: number;
+  height: number;
+  x: number; // relative to the parent DOM element
+  y: number; // relative to the parent DOM element
+  node: HTMLElement; // or the reference to the native component in React Native
+}
+```
+
+### `KeyPressDetails`
+```ts
+interface KeyPressDetails {
+  pressedKeys: PressedKeys;
+}
+```
+
+### `PressedKeys`
+```ts
+type PressedKeys = { [index: string]: number };
+```
+
+### `FocusDetails`
+```ts
+interface FocusDetails {
+  event?: KeyboardEvent;
+}
+```
 
 # Technical details and concepts
 ## Tree Hierarchy of focusable components
