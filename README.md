@@ -47,10 +47,10 @@ Leaf component is the one that doesn't have focusable children.
 `ref` is required to link the DOM element with the hook. (to measure its coordinates, size etc.)
 
 ```jsx
-import { useFocused } from '@noriginmedia/react-spatial-navigation';
+import { useFocusable } from '@noriginmedia/react-spatial-navigation';
 
 function Button() {
-  const { ref, focused } = useFocused();
+  const { ref, focused } = useFocusable();
 
   return (<div ref={ref} className={focused ? 'button-focused' : 'button'}>
     Press me
@@ -69,11 +69,11 @@ You can nest multiple Focusable Containers. When focusing the top level Containe
 I.e. if you set focus to the `Page`, the focus could propagate as following: `Page` -> `ContentWrapper` -> `ContentList` -> `ListItem`.
 
 ```jsx
-import { useFocused, FocusContext } from '@noriginmedia/react-spatial-navigation';
+import { useFocusable, FocusContext } from '@noriginmedia/react-spatial-navigation';
 import ListItem from './ListItem';
 
 function ContentList() {
-  const { ref, focusKey } = useFocused();
+  const { ref, focusKey } = useFocusable();
 
   return (<FocusContext.Provider value={focusKey}>
     <div ref={ref}>
@@ -91,10 +91,10 @@ It is useful when you first open the page, or i.e. when your modal Popup gets mo
 
 ```jsx
 import React, { useEffect } from 'react';
-import { useFocused, FocusContext } from '@noriginmedia/react-spatial-navigation';
+import { useFocusable, FocusContext } from '@noriginmedia/react-spatial-navigation';
 
 function Popup() {
-  const { ref, focusKey, focusSelf, setFocus } = useFocused();
+  const { ref, focusKey, focusSelf, setFocus } = useFocusable();
 
   // Focusing self will focus the Popup, which will pass the focus down to the first Child (ButtonPrimary)
   // Alternatively you can manually focus any other component by its 'focusKey'
@@ -116,16 +116,16 @@ function Popup() {
 
 ## Tracking children components
 Any Focusable Container can track whether it has any Child focused or not. This feature is disabled by default,
-but it can be controlled by the `trackChildren` flag passed to the `useFocused` hook. When enabled, the hook will return
+but it can be controlled by the `trackChildren` flag passed to the `useFocusable` hook. When enabled, the hook will return
 a `hasFocusedChild` flag indicating when a Container component is having focused Child down in the focusable Tree.
 It is useful for example when you want to style a container differently based on whether it has focused Child or not.
 
 ```jsx
-import { useFocused, FocusContext } from '@noriginmedia/react-spatial-navigation';
+import { useFocusable, FocusContext } from '@noriginmedia/react-spatial-navigation';
 import MenuItem from './MenuItem';
 
 function Menu() {
-  const { ref, focusKey, hasFocusedChild } = useFocused({trackChildren: true});
+  const { ref, focusKey, hasFocusedChild } = useFocusable({trackChildren: true});
 
   return (<FocusContext.Provider value={focusKey}>
     <div ref={ref} className={hasFocusedChild ? 'menu-expanded' : 'menu-collapsed'}>
@@ -143,10 +143,10 @@ a component underneath the Popup. This can be enabled with `isFocusBoundary` fla
 
 ```jsx
 import React, { useEffect } from 'react';
-import { useFocused, FocusContext } from '@noriginmedia/react-spatial-navigation';
+import { useFocusable, FocusContext } from '@noriginmedia/react-spatial-navigation';
 
 function Popup() {
-  const { ref, focusKey, focusSelf } = useFocused({isFocusBoundary: true});
+  const { ref, focusKey, focusSelf } = useFocusable({isFocusBoundary: true});
 
   useEffect(() => {
     focusSelf();
@@ -172,10 +172,10 @@ set the `focused` flag accordingly.
 
 ```jsx
 import { TouchableOpacity, Text } from 'react-native';
-import { useFocused } from '@noriginmedia/react-spatial-navigation';
+import { useFocusable } from '@noriginmedia/react-spatial-navigation';
 
 function Button() {
-  const { ref, focused, focusSelf } = useFocused();
+  const { ref, focused, focusSelf } = useFocusable();
 
   return (<TouchableOpacity
     ref={ref}
@@ -240,7 +240,7 @@ This hook is the main link between the React component (its DOM element) and the
 It is used to register the component in the service, get its `focusKey`, `focused` state etc.
 
 ```jsx
-const {/* hook output */} = useFocused({/* hook params */});
+const {/* hook output */ } = useFocusable({/* hook params */ });
 ```
 
 #### Hook params
@@ -309,7 +309,7 @@ area for this component. Usually it's a root DOM element of the component.
 
 ```jsx
 function Button() {
-  const { ref } = useFocused();
+  const { ref } = useFocusable();
 
   return (<div ref={ref}>
     Press me
@@ -407,12 +407,109 @@ best path to pass the focus to the next component.
 
 # Migration from v2 (HOC based) to v3 (Hook based)
 ## Reasons
-## Challenges and Solutions
+The main reason to ~~finally~~ migrate to Hooks is the deprecation of the `recompose` library that was a backbone for the old
+HOC implementation. As well as the deprecation of the `findDOMNode` API. It's been quite a while since Hooks were first
+introduced in React, but we were hesitating of migrating to Hooks since it would make the library usage a bit more verbose.
+However, recently there has been even more security reasons to migrate away from `recompose`, so we decided that it is time
+to say goodbye to HOC and accept certain drawbacks of the Hook implementation.
+Here are some of the challenges encountered during the migration process:
+
 ### Getting node reference
+HOC implementation used a `findDOMNode` API to find a reference to a current DOM element wrapped with the HOC:
+```js
+const node = SpatialNavigation.isNativeMode() ? this : findDOMNode(this);
+```
+Note that `this` was pointing to an actual component instance even when it was called inside `lifecycle` HOC from `recompose`
+allowing to always find the top-level DOM element, without any additional code required to point to a specific DOM node.
+It was a nice "magic" side effect of the HOC implementation, which is now getting deprecated.
+
+In the new Hook implementation we are using the recommended `ref` API. It makes a usage of the library a bit more verbose
+since now you always have to specify which DOM element is considered a "focusable" area, because this reference is used
+by the library to calculate the node's coordinates and size. [Example above](#ref-required)
+
 ### Passing `parentFocusKey` down the tree
+Another big challenge was to find a good way of passing the `parentFocusKey` down the Focusable Tree, so every focusable
+child component would always know its parent component key, in order to enable certain "tree-based" features described [here](#tree-hierarchy-of-focusable-components).
+In the old HOC implementation it was achieved via a combination of `getContext` and `withContext` HOCs. Former one was
+receiving the `parentFocusKey` from its parent no matter how deep it was in the component tree, and the latter one was
+providing its own `focusKey` as `parentFocusKey` for its children components.
+
+In modern React, the only recommended Context API is using Context Providers and Consumers (or `useContext` hook).
+While you can easily receive the Context value via `useContext`, the only way to provide the Context down the tree is via
+a JSX component `Context.Provider`. This requires some additional code in case you have a Focusable Container component.
+In order to provide the `parentFocusKey` down the tree, you have to wrap your children components with a `FocusContext.Provider`
+and provide a current `focusKey` as the context value. [Example here](#wrapping-leaf-components-with-a-focusable-container)
+
 ## Examples
 ### Migrating a [leaf](#making-your-component-focusable) focusable component
+#### HOC Props and Config vs Hook Params
+```jsx
+import {withFocusable} from '@noriginmedia/react-spatial-navigation';
+
+// Component ...
+
+const FocusableComponent = withFocusable({
+  trackChildren: true,
+  forgetLastFocusedChild: true
+})(Component);
+
+const ParentComponent = (props) => (<View>
+  ...
+  <FocusableComponent
+    trackChildren
+    forgetLastFocusedChild
+    focusKey={'FOCUSABLE_COMPONENT'}
+    onEnterPress={props.onItemPress}
+    autoRestoreFocus={false}
+  />
+  ...
+</View>);
+```
+
+Please note that **most** of the features/props could have been passed as either direct JSX `props` to the Focusable Component
+or as an config object passed to the `withFocusable` HOC. It provided certain level of flexibility, while also adding some
+confusion as to what takes priority if you pass the same option to both the `prop` and a HOC config.
+
+In the new Hook implementation options can only be passed as a [Hook Params](#hook-params):
+
+```jsx
+const {/* hook output */ } = useFocusable({
+  trackChildren: true,
+  saveLastFocusedChild: false,
+  onEnterPress: () => {
+  },
+  focusKey: 'FOCUSABLE_COMPONENT'
+});
+```
+
+#### HOC props passed to the wrapped component vs Hook output values
+HOC was enhancing the wrapped component with certain new `props` such as `focused` etc.:
+```jsx
+import {withFocusable} from '@noriginmedia/react-spatial-navigation';
+
+const Component = ({focused}) => (<View>
+  <View style={focused ? styles.focusedStyle : styles.defaultStyle} />
+</View>);
+
+const FocusableComponent = withFocusable()(Component);
+```
+
+Hook will provide all these values as the return object of the hook:
+
+```jsx
+const { focused, focusSelf, ref, ...etc } = useFocusable({/* hook params */ });
+```
+
+The only additional step when migrating from HOC to Hook (apart from changing `withFocusable` to `useFocusable` implementation)
+is to link the DOM element with the `ref` from the Hook as seen in this [example](#making-your-component-focusable).
+
+Please also note that some params and output values has been renamed. [CHANGELOG](#changelog)
+
 ### Migrating a [container](#wrapping-leaf-components-with-a-focusable-container) focusable component
+In the old HOC implementation there was no additional requirements for the Focusable Container to provide its own `focusKey`
+down the Tree as a `parentFocusKey` for its children components.
+In the Hook implementation it is required to wrap your children components with a `FocusContext.Provider` as seen in
+this [example](#wrapping-leaf-components-with-a-focusable-container).
 
 # Development
 ```bash

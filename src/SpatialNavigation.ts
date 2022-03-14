@@ -101,7 +101,7 @@ interface Corners {
   b: CornerCoordinates;
 }
 
-type PressedKeys = { [index: string]: number };
+export type PressedKeys = { [index: string]: number };
 
 /**
  * Extra details about pressed keys passed on the key events
@@ -117,7 +117,7 @@ export interface FocusDetails {
   event?: KeyboardEvent;
 }
 
-type KeyMap = { [index: string]: number };
+export type KeyMap = { [index: string]: number };
 
 export const getChildClosestToOrigin = (children: FocusableComponent[]) => {
   const childrenClosestToOrigin = sortBy(

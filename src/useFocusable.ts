@@ -14,7 +14,7 @@ import SpatialNavigation, {
 } from './SpatialNavigation';
 import { useFocusContext } from './useFocusedContext';
 
-export interface UseFocusedConfig {
+export interface UseFocusableConfig {
   focusable?: boolean;
   saveLastFocusedChild?: boolean;
   trackChildren?: boolean;
@@ -42,7 +42,7 @@ export interface UseFocusedConfig {
   extraProps?: object;
 }
 
-export interface UseFocusedResult {
+export interface UseFocusableResult {
   ref: RefObject<any>; // <any> since we don't know which HTML tag is passed here
   focusSelf: () => void;
   focused: boolean;
@@ -55,7 +55,7 @@ export interface UseFocusedResult {
   updateAllLayouts: () => void;
 }
 
-const useFocused = ({
+const useFocusable = ({
   focusable = true,
   saveLastFocusedChild = true,
   trackChildren = false,
@@ -69,7 +69,7 @@ const useFocused = ({
   onFocus = noop,
   onBlur = noop,
   extraProps
-}: UseFocusedConfig = {}): UseFocusedResult => {
+}: UseFocusableConfig = {}): UseFocusableResult => {
   const onEnterPressHandler = useCallback(
     (details: KeyPressDetails) => {
       onEnterPress(extraProps, details);
@@ -177,4 +177,4 @@ const useFocused = ({
   };
 };
 
-export default useFocused;
+export default useFocusable;

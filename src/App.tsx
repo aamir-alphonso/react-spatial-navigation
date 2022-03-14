@@ -16,7 +16,7 @@ import ReactDOM from 'react-dom';
 import styled, { createGlobalStyle } from 'styled-components';
 import { shuffle } from 'lodash';
 import { FocusContext } from './useFocusedContext';
-import useFocused from './useFocused';
+import useFocusable from './useFocusable';
 import SpatialNavigation, {
   FocusableComponentLayout,
   FocusDetails,
@@ -100,7 +100,7 @@ const MenuItemBox = styled.div<MenuItemBoxProps>`
 `;
 
 function MenuItem() {
-  const { ref, focused } = useFocused();
+  const { ref, focused } = useFocusable();
 
   return <MenuItemBox ref={ref} focused={focused} />;
 }
@@ -135,7 +135,7 @@ function Menu({ focusKey: focusKeyParam }: MenuProps) {
     // pause, -- to pause all navigation events
     // resume, -- to resume all navigation events
     // updateAllLayouts -- to force update all layouts when needed
-  } = useFocused({
+  } = useFocusable({
     focusable: true,
     saveLastFocusedChild: false,
     trackChildren: true,
@@ -207,7 +207,7 @@ interface AssetProps {
 }
 
 function Asset({ title, color, onEnterPress, onFocus }: AssetProps) {
-  const { ref, focused } = useFocused({
+  const { ref, focused } = useFocusable({
     onEnterPress,
     onFocus,
     extraProps: {
@@ -264,7 +264,7 @@ function ContentRow({
   onAssetPress,
   onFocus
 }: ContentRowProps) {
-  const { ref, focusKey } = useFocused({
+  const { ref, focusKey } = useFocusable({
     onFocus
   });
 
@@ -337,7 +337,7 @@ const ScrollingRows = styled.div`
 `;
 
 function Content() {
-  const { ref, focusKey } = useFocused();
+  const { ref, focusKey } = useFocusable();
 
   const [selectedAsset, setSelectedAsset] = useState(null);
 
