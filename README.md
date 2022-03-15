@@ -492,8 +492,7 @@ In the new Hook implementation options can only be passed as a [Hook Params](#ho
 const {/* hook output */ } = useFocusable({
   trackChildren: true,
   saveLastFocusedChild: false,
-  onEnterPress: () => {
-  },
+  onEnterPress: () => {},
   focusKey: 'FOCUSABLE_COMPONENT'
 });
 ```
