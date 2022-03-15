@@ -7,7 +7,8 @@ import {
   useState
 } from 'react';
 import { uniqueId, noop } from 'lodash';
-import SpatialNavigation, {
+import {
+  SpatialNavigation,
   FocusableComponentLayout,
   FocusDetails,
   KeyPressDetails
@@ -55,7 +56,7 @@ export interface UseFocusableResult {
   updateAllLayouts: () => void;
 }
 
-const useFocusable = ({
+const useFocusableHook = ({
   focusable = true,
   saveLastFocusedChild = true,
   trackChildren = false,
@@ -177,4 +178,4 @@ const useFocusable = ({
   };
 };
 
-export default useFocusable;
+export const useFocusable = useFocusableHook;

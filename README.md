@@ -5,7 +5,11 @@
 The main motivation to create this package was to bring the best Developer Experience and Performance when working with Spatial Navigation and React. Ideally you wouldn't want to have any logic to define the navigation in your app. It should be as easy as just to tell which components should be focusable. With this package all you have to do is to initialize it, add `useFocusable` hook to your focusable components, and set initial focus. The spatial navigation system will automatically figure out which components to focus next when you navigate with the directional keys by calculating their coordinates on the screen at runtime.
 
 # Article
-TO BE ADDED
+## HOC Article
+[Smart TV Navigation with React](https://medium.com/norigintech/smart-tv-navigation-with-react-86bd5f3037b7)
+
+## Hook Article
+TO BE UPDATED SOON
 
 # Table of Contents
 * [Example](#example-app)
@@ -352,7 +356,7 @@ Manually recalculate all the layouts. Rarely used.
 ### `FocusContext` (required for Focusable Containers)
 Used to provide the `focusKey` of the current Focusable Container down the Tree to the next child level. [See Example](#wrapping-leaf-components-with-a-focusable-container)
 
-## Types
+## Types exported for development
 ### `FocusableComponentLayout`
 ```ts
 interface FocusableComponentLayout {
@@ -384,6 +388,18 @@ interface FocusDetails {
   event?: KeyboardEvent;
 }
 ```
+
+## Other Types exported
+These types are exported, but not necessarily needed for development.
+
+### `KeyMap`
+Interface for the `keyMap` sent to the `setKeyMap` method.
+
+### `UseFocusableConfig`
+Interface for the `useFocusable` params object.
+
+### `UseFocusableResult`
+Interface for the `useFocusable` result object.
 
 # Technical details and concepts
 ## Tree Hierarchy of focusable components

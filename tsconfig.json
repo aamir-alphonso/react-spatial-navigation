@@ -1,8 +1,9 @@
 {
   "compilerOptions": {
-    "declaration": false,
-    "sourceMap": true,
+    "declaration": true,
+    "declarationDir": "dist",
     "noImplicitAny": true,
+    "stripInternal": true,
     "module": "commonjs",
     "esModuleInterop": true,
     "target": "ES5",

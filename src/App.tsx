@@ -15,15 +15,16 @@ import ReactDOM from 'react-dom';
 // eslint-disable-next-line import/no-extraneous-dependencies
 import styled, { createGlobalStyle } from 'styled-components';
 import { shuffle } from 'lodash';
-import { FocusContext } from './useFocusedContext';
-import useFocusable from './useFocusable';
-import SpatialNavigation, {
-  FocusableComponentLayout,
+import {
+  useFocusable,
+  init,
+  FocusContext,
   FocusDetails,
+  FocusableComponentLayout,
   KeyPressDetails
-} from './SpatialNavigation';
+} from './index';
 
-SpatialNavigation.init({
+init({
   debug: false,
   visualDebug: false
 });

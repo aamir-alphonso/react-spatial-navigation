@@ -3,6 +3,7 @@
   "version": "3.0.0",
   "description": "Spatial Navigation solution for React",
   "main": "dist/index.js",
+  "types": "dist/index.d.ts",
   "files": [
     "dist"
   ],
@@ -28,10 +29,8 @@
     "url": "https://github.com/NoriginMedia/react-spatial-navigation/issues"
   },
   "homepage": "https://github.com/NoriginMedia/react-spatial-navigation#readme",
-  "dependencies": {
-    "lodash": "^4.17.21"
-  },
   "peerDependencies": {
+    "lodash": ">=4.17.13",
     "react": ">=16.8.0"
   },
   "devDependencies": {
@@ -47,6 +46,7 @@
     "eslint-config-prettier": "^8.4.0",
     "eslint-plugin-import": "^2.25.4",
     "html-webpack-plugin": "^5.5.0",
+    "lodash": "^4.17.21",
     "pre-commit": "^1.2.2",
     "prettier": "^2.5.1",
     "react": "^17.0.2",

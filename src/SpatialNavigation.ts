@@ -119,7 +119,7 @@ export interface FocusDetails {
 
 export type KeyMap = { [index: string]: number };
 
-export const getChildClosestToOrigin = (children: FocusableComponent[]) => {
+const getChildClosestToOrigin = (children: FocusableComponent[]) => {
   const childrenClosestToOrigin = sortBy(
     children,
     ({ layout }) => Math.abs(layout.left) + Math.abs(layout.top)
@@ -128,7 +128,7 @@ export const getChildClosestToOrigin = (children: FocusableComponent[]) => {
   return first(childrenClosestToOrigin);
 };
 
-class SpatialNavigation {
+class SpatialNavigationService {
   private focusableComponents: { [index: string]: FocusableComponent };
 
   private visualDebugger: VisualDebugger;
@@ -390,32 +390,32 @@ class SpatialNavigation {
     const isVerticalDirection =
       direction === DIRECTION_DOWN || direction === DIRECTION_UP;
 
-    const refCorners = SpatialNavigation.getRefCorners(
+    const refCorners = SpatialNavigationService.getRefCorners(
       direction,
       false,
       currentLayout
     );
 
     return sortBy(siblings, (sibling) => {
-      const siblingCorners = SpatialNavigation.getRefCorners(
+      const siblingCorners = SpatialNavigationService.getRefCorners(
         direction,
         true,
         sibling.layout
       );
 
-      const isAdjacentSlice = SpatialNavigation.isAdjacentSlice(
+      const isAdjacentSlice = SpatialNavigationService.isAdjacentSlice(
         refCorners,
         siblingCorners,
         isVerticalDirection
       );
 
       const primaryAxisFunction = isAdjacentSlice
-        ? SpatialNavigation.getPrimaryAxisDistance
-        : SpatialNavigation.getSecondaryAxisDistance;
+        ? SpatialNavigationService.getPrimaryAxisDistance
+        : SpatialNavigationService.getSecondaryAxisDistance;
 
       const secondaryAxisFunction = isAdjacentSlice
-        ? SpatialNavigation.getSecondaryAxisDistance
-        : SpatialNavigation.getPrimaryAxisDistance;
+        ? SpatialNavigationService.getSecondaryAxisDistance
+        : SpatialNavigationService.getPrimaryAxisDistance;
 
       const primaryAxisDistance = primaryAxisFunction(
         refCorners,
@@ -834,12 +834,13 @@ class SpatialNavigation {
       const isIncrementalDirection =
         direction === DIRECTION_DOWN || direction === DIRECTION_RIGHT;
 
-      const currentCutoffCoordinate = SpatialNavigation.getCutoffCoordinate(
-        isVerticalDirection,
-        isIncrementalDirection,
-        false,
-        layout
-      );
+      const currentCutoffCoordinate =
+        SpatialNavigationService.getCutoffCoordinate(
+          isVerticalDirection,
+          isIncrementalDirection,
+          false,
+          layout
+        );
 
       /**
        * Get only the siblings with the coords on the way of our moving direction
@@ -850,12 +851,13 @@ class SpatialNavigation {
           component.focusable
         ) {
           this.updateLayout(component.focusKey);
-          const siblingCutoffCoordinate = SpatialNavigation.getCutoffCoordinate(
-            isVerticalDirection,
-            isIncrementalDirection,
-            true,
-            component.layout
-          );
+          const siblingCutoffCoordinate =
+            SpatialNavigationService.getCutoffCoordinate(
+              isVerticalDirection,
+              isIncrementalDirection,
+              true,
+              component.layout
+            );
 
           return isIncrementalDirection
             ? siblingCutoffCoordinate >= currentCutoffCoordinate
@@ -881,7 +883,7 @@ class SpatialNavigation {
       }
 
       if (this.visualDebugger) {
-        const refCorners = SpatialNavigation.getRefCorners(
+        const refCorners = SpatialNavigationService.getRefCorners(
           direction,
           false,
           layout
@@ -1382,4 +1384,7 @@ class SpatialNavigation {
 /**
  * Export singleton
  */
-export default new SpatialNavigation();
+/** @internal */
+export const SpatialNavigation = new SpatialNavigationService();
+
+export const { init, destroy, setKeyMap } = SpatialNavigation;
