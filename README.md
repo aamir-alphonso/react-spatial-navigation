@@ -23,7 +23,7 @@ TO BE UPDATED SOON
 [CHANGELOG.md](https://github.com/NoriginMedia/react-spatial-navigation/blob/master/CHANGELOG.md)
 
 # Example App
-GIF TO BE ADDED
+![Example](example.gif)
 
 [Example Source](https://github.com/NoriginMedia/react-spatial-navigation/blob/master/src/App.tsx)
 
