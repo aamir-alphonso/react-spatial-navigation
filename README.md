@@ -518,6 +518,8 @@ const { focused, focusSelf, ref, ...etc } = useFocusable({/* hook params */ });
 
 The only additional step when migrating from HOC to Hook (apart from changing `withFocusable` to `useFocusable` implementation)
 is to link the DOM element with the `ref` from the Hook as seen in this [example](#making-your-component-focusable).
+While it requires a bit of extra code compared to the HOC version, it also provides a certain level of flexibility if
+you want to make only a certain part of your UI component to act as a "focusable" area.
 
 Please also note that some params and output values has been renamed. [CHANGELOG](#changelog)
 
