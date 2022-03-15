@@ -31,19 +31,19 @@ init({
 
 const rows = shuffle([
   {
-    title: 'Row 1'
+    title: 'Recommended'
   },
   {
-    title: 'Row 2'
+    title: 'Movies'
   },
   {
-    title: 'Row 3'
+    title: 'Series'
   },
   {
-    title: 'Row 4'
+    title: 'TV Channels'
   },
   {
-    title: 'Row 5'
+    title: 'Sport'
   }
 ]);
 
@@ -91,8 +91,8 @@ interface MenuItemBoxProps {
 }
 
 const MenuItemBox = styled.div<MenuItemBoxProps>`
-  width: 40px;
-  height: 40px;
+  width: 60px;
+  height: 60px;
   background-color: ${({ focused }) => (focused ? 'white' : 'yellow')};
   border-color: darkviolet;
   border-style: solid;
@@ -182,8 +182,8 @@ interface AssetBoxProps {
 }
 
 const AssetBox = styled.div<AssetBoxProps>`
-  width: 80px;
-  height: 80px;
+  width: 100px;
+  height: 100px;
   background-color: ${({ color, focused }) => (focused ? 'white' : color)};
   border-color: darkviolet;
   border-style: solid;
@@ -310,6 +310,7 @@ const ContentWrapper = styled.div`
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  padding-top: 20px;
 `;
 
 const SelectedItemWrapper = styled.div`
@@ -360,7 +361,9 @@ function Content() {
     <FocusContext.Provider value={focusKey}>
       <ContentWrapper>
         <SelectedItemWrapper>
-          <SelectedItemBox color={selectedAsset?.color} />
+          <SelectedItemBox
+            color={selectedAsset ? selectedAsset.color : '#565b6b'}
+          />
           <SelectedItemTitle>
             {selectedAsset
               ? selectedAsset.title
