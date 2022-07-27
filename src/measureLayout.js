@@ -2,8 +2,8 @@ const ELEMENT_NODE = 1;
 
 const getRect = (node) => {
   let {offsetParent} = node;
-  const height = node.offsetHeight;
-  const width = node.offsetWidth;
+  const height = Math.floor(node.getBoundingClientRect().height);
+  const width = Math.floor(node.getBoundingClientRect().width);
   let left = node.offsetLeft;
   let top = node.offsetTop;
 
